@@ -22,6 +22,7 @@ package org.apache.helix.tools;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.commons.cli.OptionBuilder;
 import org.apache.commons.cli.OptionGroup;
 import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
+import org.apache.commons.io.FileUtils;
 import org.apache.helix.HelixAdmin;
 import org.apache.helix.HelixConstants;
 import org.apache.helix.HelixException;
@@ -61,6 +63,7 @@ import org.apache.helix.model.LiveInstance;
 import org.apache.helix.model.StateModelDefinition;
 import org.apache.helix.model.builder.ConstraintItemBuilder;
 import org.apache.helix.model.builder.HelixConfigScopeBuilder;
+import org.apache.helix.store.ZNRecordJsonSerializer;
 import org.apache.helix.util.HelixUtil;
 import org.apache.helix.util.ZKClientPool;
 import org.slf4j.Logger;
@@ -111,6 +114,9 @@ public class ClusterSetup {
   public static final String listPartitionInfo = "listPartitionInfo";
   public static final String listStateModels = "listStateModels";
   public static final String listStateModel = "listStateModel";
+
+  public static final String dumpResourceIdealState = "dumpResourceIdealState";
+  public static final String loadResourceIdealState = "loadResourceIdealState";
 
   // enable/disable/reset instances/cluster/resource/partition
   public static final String enableInstance = "enableInstance";
@@ -830,6 +836,20 @@ public class ClusterSetup {
     partitionInfoOption.setRequired(false);
     partitionInfoOption.setArgName("clusterName resourceName partitionName");
 
+    Option dumpResourceIdealStateOption =
+        OptionBuilder.withLongOpt(dumpResourceIdealState).withDescription("Dump the ideal state of a resource to a file")
+            .create();
+    resourceInfoOption.setArgs(3);
+    resourceInfoOption.setRequired(false);
+    resourceInfoOption.setArgName("clusterName resourceName fileName");
+
+    Option loadResourceIdealStateOption =
+        OptionBuilder.withLongOpt(dumpResourceIdealState).withDescription("Load the ideal state of a resource from a file")
+            .create();
+    resourceInfoOption.setArgs(3);
+    resourceInfoOption.setRequired(false);
+    resourceInfoOption.setArgName("clusterName resourceName fileName");
+
     Option enableInstanceOption =
         OptionBuilder.withLongOpt(enableInstance).withDescription("Enable/disable an instance")
             .create();
@@ -965,6 +985,8 @@ public class ClusterSetup {
     group.addOption(listInstancesOption);
     group.addOption(listResourceOption);
     group.addOption(listClustersOption);
+    group.addOption(dumpResourceIdealStateOption);
+    group.addOption(loadResourceIdealStateOption);
     group.addOption(addIdealStateOption);
     group.addOption(rebalanceOption);
     group.addOption(dropInstanceOption);
@@ -1273,6 +1295,65 @@ public class ClusterSetup {
       } else {
         System.out.println("No externalView for " + resourceName + "/" + partitionName);
       }
+      return 0;
+    } else if (cmd.hasOption(dumpResourceIdealState)) {
+      // print out partition number, resource name and replication number
+      // Also the ideal states and current states
+      String clusterName = cmd.getOptionValues(listResourceInfo)[0];
+      String resourceName = cmd.getOptionValues(listResourceInfo)[1];
+      String fileName = cmd.getOptionValues(listResourceInfo)[2];
+      IdealState idealState =
+          setupTool.getClusterManagementTool().getResourceIdealState(clusterName, resourceName);
+
+      System.out.println("Dumping IdealState for " + resourceName + " to " + fileName);
+      byte[] idealStateBytes = new ZNRecordJsonSerializer().serialize(idealState.getRecord());
+
+      FileOutputStream fos = new FileOutputStream(fileName);
+      fos.write(idealStateBytes);
+      fos.close();
+
+      return 0;
+
+    } else if (cmd.hasOption(loadResourceIdealState)) {
+      // print out partition number, resource name and replication number
+      // Also the ideal states and current states
+      String clusterName = cmd.getOptionValues(listResourceInfo)[0];
+      String resourceName = cmd.getOptionValues(listResourceInfo)[1];
+      String fileName = cmd.getOptionValues(listResourceInfo)[2];
+
+      byte[] idealStateBytes = FileUtils.readFileToByteArray(new File(fileName));
+
+      // deserialize
+      IdealState idealState = new IdealState(new ZNRecordJsonSerializer().deserialize(idealStateBytes));
+
+      System.out.println("Read ideal state from " + fileName);
+      System.out.println(new String(new ZNRecordJsonSerializer().serialize(idealState.getRecord())));
+
+      // validate
+      byte[] idealStateCheckBytes = new ZNRecordJsonSerializer().serialize(idealState.getRecord());
+
+      boolean ok = true;
+      if (idealStateBytes != idealStateCheckBytes) {
+        System.err.println("IdealState serialization validation failed! (sizes are different)");
+        ok = false;
+      }
+      for (int i = 0; ok && i < idealStateBytes.length; i++) {
+        if (idealStateBytes[i] != idealStateCheckBytes[i]) {
+          System.err.println(
+              String.format("IdealState serialization validation failed! (failed at byte %d: '%c' != '%c')",
+                  i, idealStateBytes[i], idealStateCheckBytes[i]));
+          ok = false;
+        }
+      }
+
+      if (!ok) {
+        return 0;
+      }
+
+      // set the ideal state
+      System.out.println("Setting to " + clusterName + " " + resourceName);
+      setupTool.getClusterManagementTool().setResourceIdealState(clusterName, resourceName, idealState);
+
       return 0;
 
     } else if (cmd.hasOption(enableInstance)) {
