@@ -839,16 +839,16 @@ public class ClusterSetup {
     Option dumpResourceIdealStateOption =
         OptionBuilder.withLongOpt(dumpResourceIdealState).withDescription("Dump the ideal state of a resource to a file")
             .create();
-    resourceInfoOption.setArgs(3);
-    resourceInfoOption.setRequired(false);
-    resourceInfoOption.setArgName("clusterName resourceName fileName");
+    dumpResourceIdealStateOption.setArgs(3);
+    dumpResourceIdealStateOption.setRequired(false);
+    dumpResourceIdealStateOption.setArgName("clusterName resourceName fileName");
 
     Option loadResourceIdealStateOption =
-        OptionBuilder.withLongOpt(dumpResourceIdealState).withDescription("Load the ideal state of a resource from a file")
+        OptionBuilder.withLongOpt(loadResourceIdealState).withDescription("Load the ideal state of a resource from a file")
             .create();
-    resourceInfoOption.setArgs(3);
-    resourceInfoOption.setRequired(false);
-    resourceInfoOption.setArgName("clusterName resourceName fileName");
+    loadResourceIdealStateOption.setArgs(3);
+    loadResourceIdealStateOption.setRequired(false);
+    loadResourceIdealStateOption.setArgName("clusterName resourceName fileName");
 
     Option enableInstanceOption =
         OptionBuilder.withLongOpt(enableInstance).withDescription("Enable/disable an instance")
@@ -1299,9 +1299,9 @@ public class ClusterSetup {
     } else if (cmd.hasOption(dumpResourceIdealState)) {
       // print out partition number, resource name and replication number
       // Also the ideal states and current states
-      String clusterName = cmd.getOptionValues(listResourceInfo)[0];
-      String resourceName = cmd.getOptionValues(listResourceInfo)[1];
-      String fileName = cmd.getOptionValues(listResourceInfo)[2];
+      String clusterName = cmd.getOptionValues(dumpResourceIdealState)[0];
+      String resourceName = cmd.getOptionValues(dumpResourceIdealState)[1];
+      String fileName = cmd.getOptionValues(dumpResourceIdealState)[2];
       IdealState idealState =
           setupTool.getClusterManagementTool().getResourceIdealState(clusterName, resourceName);
 
@@ -1317,9 +1317,9 @@ public class ClusterSetup {
     } else if (cmd.hasOption(loadResourceIdealState)) {
       // print out partition number, resource name and replication number
       // Also the ideal states and current states
-      String clusterName = cmd.getOptionValues(listResourceInfo)[0];
-      String resourceName = cmd.getOptionValues(listResourceInfo)[1];
-      String fileName = cmd.getOptionValues(listResourceInfo)[2];
+      String clusterName = cmd.getOptionValues(loadResourceIdealState)[0];
+      String resourceName = cmd.getOptionValues(loadResourceIdealState)[1];
+      String fileName = cmd.getOptionValues(loadResourceIdealState)[2];
 
       byte[] idealStateBytes = FileUtils.readFileToByteArray(new File(fileName));
 
